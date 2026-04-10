@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STEAK MASTER</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --char: #1a0a00;
+    --ember: #ff4500;
+    --flame: #ff8c00;
+    --gold: #d4a017;
+    --smoke: #2d2010;
+    --ash: #8b7355;
+    --cream: #f5e6c8;
+    --rare: #c0392b;
+    --medium-rare: #e74c3c;
+    --medium: #e67e22;
+    --medium-well: #d35400;
+    --well-done: #7f4d0e;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background-color: var(--char);
+    color: var(--cream);
+    font-family: 'Crimson Pro', Georgia, serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    background-image:
+      radial-gradient(ellipse at 20% 50%, rgba(255,69,0,0.08) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 20%, rgba(255,140,0,0.06) 0%, transparent 50%),
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  }
+
+  /* HEADER */
+  header {
+    text-align: center;
+    padding: 3rem 1rem 1rem;
+    position: relative;
+  }
+  header::after {
+    content: '';
+    display: block;
+    width: 60px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--ember), transparent);
+    margin: 1.2rem auto 0;
+  }
+  h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(3.5rem, 10vw, 7rem);
+    letter-spacing: 0.15em;
+    background: linear-gradient(135deg, var(--gold) 0%, var(--flame) 50%, var(--ember) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 0.9;
+  }
+  .subtitle {
+    font-size: 1rem;
+    color: var(--ash);
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    margin-top: 0.5rem;
+    font-weight: 300;
+  }
+
+  /* MAIN LAYOUT */
+  main {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+  }
+
+  /* STEP INDICATOR */
+  .steps {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 2.5rem;
+  }
+  .step-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--smoke);
+    border: 1px solid var(--ash);
+    transition: all 0.3s;
+  }
+  .step-dot.active {
+    background: var(--ember);
+    border-color: var(--ember);
+    box-shadow: 0 0 8px var(--ember);
+  }
+
+  /* SECTION CARDS */
+  .card {
+    background: rgba(45, 32, 16, 0.6);
+    border: 1px solid rgba(212, 160, 23, 0.15);
+    border-radius: 2px;
+    padding: 2rem;
+    margin-bottom: 1.5rem;
+    backdrop-filter: blur(4px);
+  }
+  .card-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.1rem;
+    letter-spacing: 0.3em;
+    color: var(--gold);
+    margin-bottom: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .card-title::before {
+    content: '';
+    display: inline-block;
+    width: 20px;
+    height: 1px;
+    background: var(--ember);
+  }
+
+  /* CONTROLS */
+  .control-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.2rem;
+  }
+  @media (max-width: 500px) {
+    .control-grid { grid-template-columns: 1fr; }
+  }
+
+  .control-group label {
+    display: block;
+    font-size: 0.75rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--ash);
+    margin-bottom: 0.5rem;
+  }
+
+  select, input[type="range"] {
+    width: 100%;
+    background: rgba(26,10,0,0.8);
+    border: 1px solid rgba(212,160,23,0.3);
+    color: var(--cream);
+    font-family: 'Crimson Pro', serif;
+    font-size: 1rem;
+    padding: 0.6rem 0.8rem;
+    border-radius: 1px;
+    outline: none;
+    transition: border-color 0.2s;
+    -webkit-appearance: none;
+  }
+  select:focus, input:focus {
+    border-color: var(--ember);
+  }
+  select option { background: #1a0a00; }
+
+  .slider-row { display: flex; align-items: center; gap: 0.8rem; }
+  input[type="range"] {
+    padding: 0;
+    height: 4px;
+    cursor: pointer;
+    accent-color: var(--ember);
+    flex: 1;
+  }
+  .slider-val {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.4rem;
+    color: var(--flame);
+    min-width: 4.5rem;
+    text-align: right;
+  }
+
+  /* DONENESS PILLS */
+  .pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+  .pill {
+    padding: 0.4rem 1rem;
+    border-radius: 999px;
+    border: 1px solid rgba(212,160,23,0.2);
+    font-size: 0.85rem;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: transparent;
+    color: var(--ash);
+  }
+  .pill:hover { border-color: var(--flame); color: var(--cream); }
+  .pill.selected {
+    background: var(--ember);
+    border-color: var(--ember);
+    color: white;
+    box-shadow: 0 0 12px rgba(255,69,0,0.4);
+  }
+
+  /* START BUTTON */
+  .btn-start {
+    display: block;
+    width: 100%;
+    padding: 1rem;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.5rem;
+    letter-spacing: 0.3em;
+    background: linear-gradient(135deg, var(--ember), var(--flame));
+    color: var(--char);
+    border: none;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 20px rgba(255,69,0,0.3);
+  }
+  .btn-start:hover {
+    box-shadow: 0 6px 30px rgba(255,69,0,0.5);
+    transform: translateY(-1px);
+  }
+  .btn-start:active { transform: translateY(0); }
+  .btn-start:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  /* ===================== TIMER SCREEN ===================== */
+  #timer-screen { display: none; }
+
+  .phase-badge {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 0.9rem;
+    letter-spacing: 0.4em;
+    color: var(--ash);
+    text-align: center;
+    margin-bottom: 0.5rem;
+  }
+
+  .phase-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(2rem, 6vw, 3.5rem);
+    text-align: center;
+    line-height: 1;
+    margin-bottom: 0.3rem;
+    background: linear-gradient(135deg, var(--gold), var(--flame));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .phase-instruction {
+    text-align: center;
+    font-size: 1.15rem;
+    color: var(--cream);
+    font-style: italic;
+    line-height: 1.5;
+    margin-bottom: 2rem;
+    padding: 0 1rem;
+  }
+
+  /* CIRCULAR TIMER */
+  .timer-wrap {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 2rem;
+  }
+  .timer-ring-container {
+    position: relative;
+    width: 200px;
+    height: 200px;
+  }
+  .timer-ring-container svg {
+    transform: rotate(-90deg);
+  }
+  .ring-bg { fill: none; stroke: var(--smoke); stroke-width: 8; }
+  .ring-progress {
+    fill: none;
+    stroke: var(--ember);
+    stroke-width: 8;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1s linear;
+    filter: drop-shadow(0 0 6px var(--ember));
+  }
+  .timer-center {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+  }
+  .timer-digits {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 3.5rem;
+    line-height: 1;
+    color: var(--cream);
+    letter-spacing: 0.05em;
+  }
+  .timer-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.3em;
+    color: var(--ash);
+    text-transform: uppercase;
+  }
+
+  /* TEMP GAUGE */
+  .temp-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  @media (max-width: 460px) { .temp-section { grid-template-columns: 1fr; } }
+
+  .temp-card {
+    background: rgba(26,10,0,0.6);
+    border: 1px solid rgba(212,160,23,0.12);
+    border-radius: 2px;
+    padding: 1.2rem;
+    text-align: center;
+  }
+  .temp-card .tc-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--ash);
+    margin-bottom: 0.3rem;
+  }
+  .temp-card .tc-value {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.2rem;
+    line-height: 1;
+  }
+  .temp-card .tc-sub {
+    font-size: 0.85rem;
+    margin-top: 0.2rem;
+    font-style: italic;
+  }
+
+  /* DONENESS BAR */
+  .doneness-bar-wrap {
+    margin-bottom: 1.5rem;
+  }
+  .db-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    color: var(--ash);
+    text-transform: uppercase;
+    margin-bottom: 0.4rem;
+  }
+  .db-track {
+    height: 6px;
+    border-radius: 3px;
+    background: linear-gradient(90deg,
+      var(--rare) 0%, var(--medium-rare) 25%,
+      var(--medium) 50%, var(--medium-well) 75%, var(--well-done) 100%);
+    position: relative;
+  }
+  .db-indicator {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 14px; height: 14px;
+    background: white;
+    border-radius: 50%;
+    border: 2px solid var(--char);
+    box-shadow: 0 0 8px rgba(255,255,255,0.6);
+    transition: left 1s ease;
+  }
+
+  /* NEXT PHASE PREVIEW */
+  .next-preview {
+    background: rgba(45,32,16,0.3);
+    border: 1px dashed rgba(212,160,23,0.2);
+    border-radius: 2px;
+    padding: 1rem 1.2rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.8rem;
+    margin-bottom: 1.5rem;
+  }
+  .next-preview .np-icon {
+    font-size: 1.3rem;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .next-preview .np-text {
+    font-size: 0.88rem;
+    color: var(--ash);
+    line-height: 1.5;
+  }
+  .next-preview .np-text strong {
+    display: block;
+    font-size: 0.7rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 0.2rem;
+    font-style: normal;
+    font-weight: 400;
+  }
+
+  /* CONTROL BTNS */
+  .ctrl-btns {
+    display: flex;
+    gap: 0.8rem;
+  }
+  .btn-secondary {
+    flex: 1;
+    padding: 0.8rem;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.1rem;
+    letter-spacing: 0.2em;
+    background: transparent;
+    border: 1px solid rgba(212,160,23,0.3);
+    color: var(--ash);
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-secondary:hover { border-color: var(--gold); color: var(--cream); }
+
+  .btn-next {
+    flex: 2;
+    padding: 0.8rem;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.1rem;
+    letter-spacing: 0.2em;
+    background: linear-gradient(135deg, var(--ember), var(--flame));
+    border: none;
+    color: var(--char);
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-next:hover { box-shadow: 0 4px 16px rgba(255,69,0,0.4); }
+  .btn-next:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  /* DONE SCREEN */
+  #done-screen {
+    display: none;
+    text-align: center;
+    padding: 3rem 1rem;
+  }
+  .done-emoji { font-size: 4rem; display: block; margin-bottom: 1rem; }
+  .done-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 3rem;
+    background: linear-gradient(135deg, var(--gold), var(--flame));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 0.5rem;
+    letter-spacing: 0.1em;
+  }
+  .done-sub {
+    color: var(--ash);
+    font-style: italic;
+    margin-bottom: 2rem;
+    font-size: 1.1rem;
+  }
+  .done-stats {
+    display: inline-grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  .done-stat {
+    background: rgba(45,32,16,0.6);
+    border: 1px solid rgba(212,160,23,0.15);
+    padding: 1rem;
+    border-radius: 2px;
+    text-align: center;
+  }
+  .done-stat .ds-val {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.8rem;
+    color: var(--flame);
+  }
+  .done-stat .ds-lbl {
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ash);
+    margin-top: 0.2rem;
+  }
+
+  /* PHASE COMPLETE FLASH */
+  @keyframes flash {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.2; }
+  }
+  .flash { animation: flash 0.4s ease 3; }
+
+  /* PULSE for running timer */
+  @keyframes pulse-glow {
+    0%, 100% { filter: drop-shadow(0 0 6px var(--ember)); }
+    50% { filter: drop-shadow(0 0 14px var(--ember)); }
+  }
+  .ring-running { animation: pulse-glow 2s ease-in-out infinite; }
+
+  /* ALARM overlay */
+  #alarm-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(255,69,0,0.15);
+    backdrop-filter: blur(2px);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    text-align: center;
+    padding: 2rem;
+  }
+  #alarm-overlay.show { display: flex; animation: flash 0.5s ease 4; }
+  #alarm-overlay .alarm-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(2.5rem, 8vw, 5rem);
+    color: var(--cream);
+    letter-spacing: 0.1em;
+    text-shadow: 0 0 30px var(--ember);
+    margin-bottom: 0.5rem;
+  }
+  #alarm-overlay .alarm-msg {
+    font-size: 1.2rem;
+    color: var(--gold);
+    font-style: italic;
+    margin-bottom: 2rem;
+    max-width: 400px;
+  }
+  #alarm-overlay .btn-dismiss {
+    padding: 1rem 3rem;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.4rem;
+    letter-spacing: 0.3em;
+    background: var(--ember);
+    color: var(--char);
+    border: none;
+    border-radius: 2px;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>STEAK<br>MASTER</h1>
+  <p class="subtitle">Der perfekte Garprozess</p>
+</header>
+
+<!-- ALARM OVERLAY -->
+<div id="alarm-overlay">
+  <div class="alarm-title" id="alarm-title">WENDEN!</div>
+  <div class="alarm-msg" id="alarm-msg">Zeit für die nächste Phase</div>
+  <button class="btn-dismiss" onclick="dismissAlarm()">WEITER →</button>
+</div>
+
+<main>
+
+  <!-- SETUP SCREEN -->
+  <div id="setup-screen">
+    <div class="steps" id="step-dots"></div>
+
+    <div class="card">
+      <div class="card-title">Gargrad</div>
+      <div class="pills" id="doneness-pills"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Fleisch & Grill</div>
+      <div class="control-grid">
+        <div class="control-group">
+          <label>Dicke (mm)</label>
+          <div class="slider-row">
+            <input type="range" id="thickness-slider" min="10" max="50" step="5" value="20"
+              oninput="document.getElementById('thickness-val').textContent = this.value + ' mm'">
+            <span class="slider-val" id="thickness-val">20 mm</span>
+          </div>
+        </div>
+        <div class="control-group">
+          <label>Grilltemperatur (°C)</label>
+          <div class="slider-row">
+            <input type="range" id="grill-temp-slider" min="150" max="300" step="10" value="230"
+              oninput="document.getElementById('grill-temp-val').textContent = this.value + ' °C'">
+            <span class="slider-val" id="grill-temp-val">230 °C</span>
+          </div>
+        </div>
+        <div class="control-group" style="grid-column: 1 / -1">
+          <label>Fleischtyp</label>
+          <select id="meat-type">
+            <option value="beef">Rind (Ribeye, Entrecôte)</option>
+            <option value="beef-thick">Rind (Sirloin, T-Bone)</option>
+            <option value="pork">Schwein (Kotelett)</option>
+            <option value="lamb">Lamm (Lammkotelett)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-start" id="start-btn" onclick="startCooking()">FEUER MACHEN →</button>
+  </div>
+
+  <!-- TIMER SCREEN -->
+  <div id="timer-screen">
+    <div class="phase-badge" id="phase-badge">PHASE 1 / 4</div>
+    <div class="phase-title" id="phase-title">DIREKTE HITZE</div>
+    <div class="phase-instruction" id="phase-instruction">Lege das Steak auf die heiße Grillzone.</div>
+
+    <div class="timer-wrap">
+      <div class="timer-ring-container">
+        <svg width="200" height="200" viewBox="0 0 200 200">
+          <circle class="ring-bg" cx="100" cy="100" r="88"/>
+          <circle class="ring-progress" id="ring-progress" cx="100" cy="100" r="88"
+            stroke-dasharray="553" stroke-dashoffset="0"/>
+        </svg>
+        <div class="timer-center">
+          <div class="timer-digits" id="timer-digits">0:00</div>
+          <div class="timer-label">verbleibend</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="temp-section">
+      <div class="temp-card">
+        <div class="tc-label">Geschätzte Kerntemperatur</div>
+        <div class="tc-value" id="core-temp-val" style="color: var(--flame)">—</div>
+        <div class="tc-sub" id="core-temp-unit" style="color: var(--ash)">°C</div>
+      </div>
+      <div class="temp-card">
+        <div class="tc-label">Momentaner Gargrad</div>
+        <div class="tc-value" id="current-doneness-val" style="font-size: 1.3rem; color: var(--cream)">—</div>
+        <div class="tc-sub" id="current-doneness-sub" style="color: var(--ash)">—</div>
+      </div>
+    </div>
+
+    <div class="doneness-bar-wrap">
+      <div class="db-labels">
+        <span>Roh</span><span>Rare</span><span>Med-Rare</span><span>Medium</span><span>Well</span>
+      </div>
+      <div class="db-track">
+        <div class="db-indicator" id="db-indicator" style="left: 0%"></div>
+      </div>
+    </div>
+
+    <div class="next-preview" id="next-preview">
+      <span class="np-icon">👁</span>
+      <div class="np-text">
+        <strong>Als Nächstes</strong>
+        <span id="next-instruction-text">—</span>
+      </div>
+    </div>
+
+    <div class="ctrl-btns">
+      <button class="btn-secondary" onclick="resetApp()">↩ Neu</button>
+      <button class="btn-secondary" id="pause-btn" onclick="togglePause()">⏸ Pause</button>
+      <button class="btn-next" id="skip-btn" onclick="advancePhase()">Weiter →</button>
+    </div>
+  </div>
+
+  <!-- DONE SCREEN -->
+  <div id="done-screen">
+    <span class="done-emoji">🔥</span>
+    <div class="done-title">PERFEKT!</div>
+    <div class="done-sub" id="done-sub">Dein Steak ist bereit</div>
+    <div class="done-stats">
+      <div class="done-stat">
+        <div class="done-stat ds-val" id="done-total-time">—</div>
+        <div class="ds-lbl">Gesamtzeit</div>
+      </div>
+      <div class="done-stat">
+        <div class="ds-val" id="done-final-temp">—</div>
+        <div class="ds-lbl">Kerntemp.</div>
+      </div>
+      <div class="done-stat">
+        <div class="ds-val" id="done-doneness">—</div>
+        <div class="ds-lbl">Gargrad</div>
+      </div>
+    </div>
+    <button class="btn-start" onclick="resetApp()" style="max-width: 300px; margin: 0 auto;">
+      NEUES STEAK →
+    </button>
+  </div>
+
+</main>
+
+<script>
+// ===================== DATA =====================
+const DONENESS = [
+  { id: 'rare',        label: 'Rare',        tempMin: 48, tempMax: 52, targetTemp: 50, color: '#c0392b' },
+  { id: 'medium-rare', label: 'Medium Rare', tempMin: 52, tempMax: 55, targetTemp: 54, color: '#e74c3c' },
+  { id: 'medium',      label: 'Medium',      tempMin: 55, tempMax: 60, targetTemp: 57, color: '#e67e22' },
+  { id: 'medium-well', label: 'Medium Well', tempMin: 60, tempMax: 65, targetTemp: 63, color: '#d35400' },
+  { id: 'well-done',   label: 'Well Done',   tempMin: 65, tempMax: 75, targetTemp: 70, color: '#7f4d0e' },
+];
+
+// ===================== STATE =====================
+let state = {
+  doneness: 'medium',
+  thickness: 20,
+  grillTemp: 230,
+  meatType: 'beef',
+  phases: [],
+  currentPhase: 0,
+  phaseSecondsLeft: 0,
+  phaseTotalSeconds: 0,
+  totalElapsed: 0,
+  paused: false,
+  timer: null,
+  startCoreTemp: 4,  // steak from fridge
+};
+
+// ===================== INIT =====================
+function init() {
+  const pills = document.getElementById('doneness-pills');
+  DONENESS.forEach(d => {
+    const el = document.createElement('button');
+    el.className = 'pill' + (d.id === 'medium' ? ' selected' : '');
+    el.textContent = d.label + ' (' + d.tempMin + '–' + d.tempMax + '°C)';
+    el.onclick = () => {
+      document.querySelectorAll('.pill').forEach(p => p.classList.remove('selected'));
+      el.classList.add('selected');
+      state.doneness = d.id;
+    };
+    pills.appendChild(el);
+  });
+}
+
+// ===================== PHASE CALCULATION =====================
+function calcPhases(thickness, grillTemp, donenessId, meatType) {
+  const d = DONENESS.find(x => x.id === donenessId);
+  const targetTemp = d.targetTemp;
+  // thickness factor: base 20mm
+  const tf = thickness / 20;
+  // temp factor: base 230°C
+  const tempF = 230 / grillTemp; // higher temp → less time
+
+  // PHASE definitions
+  // Times are for base (20mm, 230°C, beef, medium)
+  const isIndirect = (meatType === 'beef-thick');
+
+  // Direct sear time per side (seconds)
+  const searBase = 110 * tf * tempF; // ~1:50 per side at base
+
+  // Indirect time depends on thickness and target temp
+  // Estimate: core starts ~4°C (fridge), need to reach targetTemp
+  // Heating rate during indirect: roughly 5–8°C per minute depending on thickness
+  const heatingRate = (7 - thickness * 0.04) * (grillTemp / 230) / 60; // °C per second
+  const indirectNeeded = Math.max(0, targetTemp - 40); // after searing, assume core ~40°C
+  const indirectTime = Math.round(indirectNeeded / heatingRate);
+
+  const restTime = Math.round(90 * tf); // rest time
+
+  let phases = [];
+
+  if (thickness <= 25) {
+    // THIN: only direct
+    phases = [
+      {
+        id: 'sear1',
+        title: 'SEITE 1 GRILLEN',
+        badge: (p, t) => `PHASE ${p+1} / ${t}`,
+        instruction: 'Steak auf die direkte Hitzezone legen. Nicht bewegen lassen!',
+        seconds: Math.round(searBase),
+        type: 'direct',
+        nextHint: 'Gleich wenden — halte die Zange bereit.',
+      },
+      {
+        id: 'sear2',
+        title: 'SEITE 2 GRILLEN',
+        badge: (p, t) => `PHASE ${p+1} / ${t}`,
+        instruction: 'Steak wenden. Weiter auf direkter Hitze grillen.',
+        seconds: Math.round(searBase),
+        type: 'direct',
+        nextHint: 'Steak von der Hitze nehmen und ruhen lassen.',
+      },
+      {
+        id: 'rest',
+        title: 'RUHEN LASSEN',
+        badge: (p, t) => `PHASE ${p+1} / ${t}`,
+        instruction: 'Steak von der Hitze nehmen, locker mit Folie abdecken und ruhen lassen.',
+        seconds: restTime,
+        type: 'rest',
+        nextHint: 'Danach: Steak aufschneiden und genießen!',
+      },
+    ];
+  } else {
+    // THICK: sear then indirect
+    const indirectTime2 = Math.max(120, indirectTime);
+    phases = [
+      {
+        id: 'sear1',
+        title: 'SEITE 1 ANBRATEN',
+        badge: (p, t) => `PHASE ${p+1} / ${t}`,
+        instruction: 'Steak auf direkte Hitzezone — scharfes Anbraten für Kruste.',
+        seconds: Math.round(searBase * 0.8),
+        type: 'direct',
+        nextHint: 'Gleich wenden für die andere Seite.',
+      },
+      {
+        id: 'sear2',
+        title: 'SEITE 2 ANBRATEN',
+        badge: (p, t) => `PHASE ${p+1} / ${t}`,
+        instruction: 'Wenden und zweite Seite scharf anbraten.',
+        seconds: Math.round(searBase * 0.8),
+        type: 'direct',
+        nextHint: 'Steak in die indirekte Zone verschieben — Deckel schließen.',
+      },
+      {
+        id: 'indirect',
+        title: 'INDIREKTES GAREN',
+        badge: (p, t) => `PHASE ${p+1} / ${t}`,
+        instruction: 'Steak in die indirekte Zone verschieben. Grilldeckel schließen.',
+        seconds: indirectTime2,
+        type: 'indirect',
+        nextHint: 'Steak herausnehmen und ruhen lassen.',
+        startCoreTemp: 40,
+        endCoreTemp: targetTemp,
+      },
+      {
+        id: 'rest',
+        title: 'RUHEN LASSEN',
+        badge: (p, t) => `PHASE ${p+1} / ${t}`,
+        instruction: 'Steak von der Hitze nehmen. Locker mit Folie abdecken.',
+        seconds: restTime,
+        type: 'rest',
+        nextHint: 'Jetzt aufschneiden — Kerntemperatur prüfen und genießen!',
+      },
+    ];
+  }
+
+  return phases;
+}
+
+// ===================== DONENESS FROM TEMP =====================
+function donenessFromTemp(temp) {
+  if (temp < 40) return { label: 'Roh', sub: '< 40°C', pct: temp / 48 * 5, color: '#888' };
+  if (temp < 48) return { label: 'Blue Rare', sub: '40–48°C', pct: 3 + (temp-40)/8*7, color: '#a03030' };
+  if (temp < 52) return { label: 'Rare', sub: '48–52°C', pct: 10 + (temp-48)/4*15, color: '#c0392b' };
+  if (temp < 55) return { label: 'Medium Rare', sub: '52–55°C', pct: 25 + (temp-52)/3*25, color: '#e74c3c' };
+  if (temp < 60) return { label: 'Medium', sub: '55–60°C', pct: 50 + (temp-55)/5*20, color: '#e67e22' };
+  if (temp < 65) return { label: 'Medium Well', sub: '60–65°C', pct: 70 + (temp-60)/5*15, color: '#d35400' };
+  return { label: 'Well Done', sub: '65°C+', pct: 85 + Math.min((temp-65)/10*15, 15), color: '#7f4d0e' };
+}
+
+// ===================== CORE TEMP ESTIMATE =====================
+function estimateCoreTemp() {
+  const phase = state.phases[state.currentPhase];
+  const elapsed = state.phaseTotalSeconds - state.phaseSecondsLeft;
+  const phaseFraction = elapsed / state.phaseTotalSeconds;
+
+  if (phase.type === 'direct') {
+    // Direct: surface rises fast, core slower
+    // Approximate: core goes from startCoreTemp toward ~40–45°C during searing
+    const phaseIndex = state.currentPhase;
+    if (phaseIndex === 0) {
+      return state.startCoreTemp + phaseFraction * (20 - state.startCoreTemp);
+    } else if (phaseIndex === 1) {
+      return 20 + phaseFraction * 20;
+    }
+    return 40 + phaseFraction * 5;
+  } else if (phase.type === 'indirect') {
+    const start = phase.startCoreTemp || 40;
+    const end = phase.endCoreTemp || 55;
+    // Sigmoid-ish curve: starts slow, accelerates, slows near target
+    const eased = 0.5 - 0.5 * Math.cos(Math.PI * phaseFraction);
+    return start + eased * (end - start);
+  } else if (phase.type === 'rest') {
+    // During rest, temp first rises ~2-4°C then starts dropping slowly
+    const peakFraction = 0.3;
+    const d = DONENESS.find(x => x.id === state.doneness);
+    const peak = d.targetTemp + 2;
+    if (phaseFraction <= peakFraction) {
+      return d.targetTemp + (phaseFraction / peakFraction) * 2;
+    } else {
+      return peak - ((phaseFraction - peakFraction) / (1 - peakFraction)) * 2;
+    }
+  }
+  return state.startCoreTemp;
+}
+
+// ===================== START =====================
+function startCooking() {
+  state.doneness = document.querySelector('.pill.selected')?.textContent.split(' (')[0].toLowerCase().replace(' ', '-') || 'medium';
+  // re-derive id
+  const sel = DONENESS.find(d => document.querySelector('.pill.selected')?.textContent.includes(d.label));
+  state.doneness = sel ? sel.id : 'medium';
+  state.thickness = parseInt(document.getElementById('thickness-slider').value);
+  state.grillTemp = parseInt(document.getElementById('grill-temp-slider').value);
+  state.meatType = document.getElementById('meat-type').value;
+
+  state.phases = calcPhases(state.thickness, state.grillTemp, state.doneness, state.meatType);
+  state.currentPhase = 0;
+  state.totalElapsed = 0;
+  state.paused = false;
+
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('timer-screen').style.display = 'block';
+
+  loadPhase(0);
+  runTimer();
+}
+
+function loadPhase(idx) {
+  const phases = state.phases;
+  const phase = phases[idx];
+  state.phaseSecondsLeft = phase.seconds;
+  state.phaseTotalSeconds = phase.seconds;
+
+  document.getElementById('phase-badge').textContent = phase.badge(idx, phases.length);
+  document.getElementById('phase-title').textContent = phase.title;
+  document.getElementById('phase-instruction').textContent = phase.instruction;
+
+  const ringCirc = 553;
+  document.getElementById('ring-progress').style.strokeDashoffset = '0';
+
+  // Next phase preview
+  const nextPhase = phases[idx + 1];
+  const npText = document.getElementById('next-instruction-text');
+  const npPreview = document.getElementById('next-preview');
+  if (nextPhase) {
+    npText.textContent = nextPhase.instruction;
+    npPreview.style.display = 'flex';
+  } else {
+    npText.textContent = 'Das war\'s! Guten Appetit.';
+    npPreview.style.display = 'flex';
+  }
+
+  updateTempDisplay();
+  updateTimerDisplay();
+}
+
+// ===================== TIMER =====================
+function runTimer() {
+  if (state.timer) clearInterval(state.timer);
+  state.timer = setInterval(tick, 1000);
+}
+
+function tick() {
+  if (state.paused) return;
+  if (state.phaseSecondsLeft > 0) {
+    state.phaseSecondsLeft--;
+    state.totalElapsed++;
+    updateTimerDisplay();
+    updateRing();
+    updateTempDisplay();
+  } else {
+    // Phase done
+    clearInterval(state.timer);
+    showAlarm();
+  }
+}
+
+function updateTimerDisplay() {
+  const s = state.phaseSecondsLeft;
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  document.getElementById('timer-digits').textContent = m + ':' + String(sec).padStart(2, '0');
+}
+
+function updateRing() {
+  const circ = 553;
+  const frac = state.phaseSecondsLeft / state.phaseTotalSeconds;
+  document.getElementById('ring-progress').style.strokeDashoffset = (circ * (1 - frac)).toFixed(1);
+}
+
+function updateTempDisplay() {
+  const temp = estimateCoreTemp();
+  const tempRounded = Math.round(temp * 10) / 10;
+  document.getElementById('core-temp-val').textContent = tempRounded.toFixed(1);
+  const info = donenessFromTemp(temp);
+  document.getElementById('current-doneness-val').style.color = info.color;
+  document.getElementById('current-doneness-val').textContent = info.label;
+  document.getElementById('current-doneness-sub').textContent = info.sub;
+  document.getElementById('db-indicator').style.left = Math.min(98, Math.max(2, info.pct)) + '%';
+}
+
+function togglePause() {
+  state.paused = !state.paused;
+  document.getElementById('pause-btn').textContent = state.paused ? '▶ Weiter' : '⏸ Pause';
+}
+
+// ===================== ALARM =====================
+function showAlarm() {
+  const phase = state.phases[state.currentPhase];
+  const next = state.phases[state.currentPhase + 1];
+  const overlay = document.getElementById('alarm-overlay');
+  document.getElementById('alarm-title').textContent = next ? 'PHASE FERTIG!' : 'FERTIG!';
+  document.getElementById('alarm-msg').textContent = next ? next.instruction : 'Steak ist perfekt – guten Appetit!';
+  overlay.classList.add('show');
+  // vibrate if supported
+  if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
+}
+
+function dismissAlarm() {
+  document.getElementById('alarm-overlay').classList.remove('show');
+  advancePhase();
+}
+
+function advancePhase() {
+  const nextIdx = state.currentPhase + 1;
+  if (nextIdx >= state.phases.length) {
+    showDone();
+    return;
+  }
+  state.currentPhase = nextIdx;
+  loadPhase(nextIdx);
+  runTimer();
+}
+
+// ===================== DONE =====================
+function showDone() {
+  clearInterval(state.timer);
+  document.getElementById('timer-screen').style.display = 'none';
+  document.getElementById('done-screen').style.display = 'block';
+
+  const d = DONENESS.find(x => x.id === state.doneness);
+  const totalMin = Math.floor(state.totalElapsed / 60);
+  const totalSec = state.totalElapsed % 60;
+  const finalTemp = d.targetTemp;
+
+  document.getElementById('done-total-time').textContent = totalMin + ':' + String(totalSec).padStart(2, '0');
+  document.getElementById('done-final-temp').textContent = '~' + finalTemp + '°C';
+  document.getElementById('done-doneness').textContent = d.label;
+  document.getElementById('done-sub').textContent = 'Dein ' + d.label + ' Steak ist bereit!';
+}
+
+// ===================== RESET =====================
+function resetApp() {
+  clearInterval(state.timer);
+  document.getElementById('alarm-overlay').classList.remove('show');
+  document.getElementById('done-screen').style.display = 'none';
+  document.getElementById('timer-screen').style.display = 'none';
+  document.getElementById('setup-screen').style.display = 'block';
+  state.paused = false;
+  document.getElementById('pause-btn').textContent = '⏸ Pause';
+}
+
+// ===================== BOOT =====================
+init();
+</script>
+</body>
+</html>
