@@ -570,29 +570,39 @@
       <div class="pills" id="doneness-pills"></div>
     </div>
 
+    <div class="card" style="border-color: rgba(255,140,0,0.3); background: rgba(60,35,5,0.7);">
+      <div class="card-title" style="color: var(--flame)">Vorbereitung</div>
+      <div style="font-size: 1rem; color: var(--cream); line-height: 1.7; font-style: italic;">
+        🕐 Steak <strong style="font-style:normal; color:var(--gold)">30–60 Minuten vor dem Grillen</strong> aus dem Kühlschrank nehmen &mdash; Kerntemperatur startet bei ca. <strong style="font-style:normal; color:var(--gold)">20&deg;C</strong> f&uuml;r gleichm&auml;&szlig;igeres Garen.
+      </div>
+    </div>
+
     <div class="card">
-      <div class="card-title">Fleisch & Grill</div>
+      <div class="card-title">Fleisch &amp; Grill</div>
       <div class="control-grid">
         <div class="control-group">
           <label>Dicke (mm)</label>
           <div class="slider-row">
-            <input type="range" id="thickness-slider" min="10" max="50" step="5" value="20"
-              oninput="document.getElementById('thickness-val').textContent = this.value + ' mm'">
-            <span class="slider-val" id="thickness-val">20 mm</span>
+            <input type="range" id="thickness-slider" min="10" max="50" step="5" value="30"
+              oninput="updateThickness(this.value)">
+            <span class="slider-val" id="thickness-val">30 mm</span>
           </div>
         </div>
         <div class="control-group">
-          <label>Grilltemperatur (°C)</label>
+          <label>Indirekte Temperatur (&deg;C)</label>
           <div class="slider-row">
-            <input type="range" id="grill-temp-slider" min="150" max="300" step="10" value="230"
-              oninput="document.getElementById('grill-temp-val').textContent = this.value + ' °C'">
-            <span class="slider-val" id="grill-temp-val">230 °C</span>
+            <input type="range" id="grill-temp-slider" min="120" max="250" step="10" value="175"
+              oninput="updateGrillTemp(this.value)">
+            <span class="slider-val" id="grill-temp-val">175 &deg;C</span>
+          </div>
+          <div id="grill-temp-hint" style="font-size:0.75rem; color:var(--ash); margin-top:0.4rem; font-style:italic;">
+            Gleichm&auml;&szlig;ig &amp; saftig
           </div>
         </div>
         <div class="control-group" style="grid-column: 1 / -1">
           <label>Fleischtyp</label>
           <select id="meat-type">
-            <option value="beef">Rind (Ribeye, Entrecôte)</option>
+            <option value="beef">Rind (Ribeye, Entrecc&ocirc;te)</option>
             <option value="beef-thick">Rind (Sirloin, T-Bone)</option>
             <option value="pork">Schwein (Kotelett)</option>
             <option value="lamb">Lamm (Lammkotelett)</option>
@@ -697,6 +707,9 @@ const DONENESS = [
   { id: 'well-done',   label: 'Well Done',   tempMin: 65, tempMax: 75, targetTemp: 70, color: '#7f4d0e' },
 ];
 
+// Room temperature start (steak taken out of fridge 30-60 min before)
+const ROOM_TEMP = 20;
+
 // ===================== STATE =====================
 let state = {
   doneness: 'medium',
@@ -707,10 +720,12 @@ let state = {
   currentPhase: 0,
   phaseSecondsLeft: 0,
   phaseTotalSeconds: 0,
+  // cumulative elapsed seconds across all phases (for global temp curve)
   totalElapsed: 0,
   paused: false,
   timer: null,
-  startCoreTemp: 4,  // steak from fridge
+  // Temperature tracking: temp at start of each phase
+  phaseStartTemps: [],
 };
 
 // ===================== INIT =====================
@@ -730,104 +745,137 @@ function init() {
 }
 
 // ===================== PHASE CALCULATION =====================
+/**
+ * Physics model:
+ * - Steak starts at ROOM_TEMP (20°C) — taken from fridge 30–60 min before
+ * - Sear phase (>300°C direct): surface gets crust, core heats moderately
+ *   • Per side: 60–90s at base (20mm, 300°C sizzle zone)
+ *   • Core rises ~8–12°C during sear (surface effect, short contact)
+ * - Indirect phase (150–200°C target for setup, but user sets overall grill temp):
+ *   • Heating rate based on Newton's law of cooling adaptation:
+ *     dT/dt = k * (T_grill - T_core) / thickness_factor
+ *   • Thicker steaks heat slower; lower indirect temps = slower but more even
+ *   • 3–4 cm steak: ~10–20 min at 150–200°C indirect
+ * - Rest phase: carry-over +2–3°C, then slow descent
+ */
 function calcPhases(thickness, grillTemp, donenessId, meatType) {
   const d = DONENESS.find(x => x.id === donenessId);
   const targetTemp = d.targetTemp;
-  // thickness factor: base 20mm
-  const tf = thickness / 20;
-  // temp factor: base 230°C
-  const tempF = 230 / grillTemp; // higher temp → less time
 
-  // PHASE definitions
-  // Times are for base (20mm, 230°C, beef, medium)
-  const isIndirect = (meatType === 'beef-thick');
+  // Thickness in mm, base reference 30mm
+  const thicknessCm = thickness / 10;
 
-  // Direct sear time per side (seconds)
-  const searBase = 110 * tf * tempF; // ~1:50 per side at base
+  // ---- SEAR PHASE ----
+  // Sear happens at max heat (sizzle zone >300°C regardless of indirect setting)
+  // Time per side: scales with thickness. Base: 75s for 20mm. 
+  // Thicker = slightly longer sear for proper crust
+  const searPerSide = Math.round(75 * Math.pow(thickness / 20, 0.6));
 
-  // Indirect time depends on thickness and target temp
-  // Estimate: core starts ~4°C (fridge), need to reach targetTemp
-  // Heating rate during indirect: roughly 5–8°C per minute depending on thickness
-  const heatingRate = (7 - thickness * 0.04) * (grillTemp / 230) / 60; // °C per second
-  const indirectNeeded = Math.max(0, targetTemp - 40); // after searing, assume core ~40°C
-  const indirectTime = Math.round(indirectNeeded / heatingRate);
+  // Core temp rise during sear phase:
+  // Direct heat at 300°C: surface chars fast, core gets +8–15°C total
+  // Both sides: ROOM_TEMP → ROOM_TEMP + rise
+  // rise ≈ 10 + 2*(thickness/10) °C — thicker steak conducts less during short sear
+  const sear1EndTemp = ROOM_TEMP + 6 + (thickness / 10) * 1.5;  // after side 1
+  const sear2EndTemp = sear1EndTemp + 8 + (thickness / 10) * 1.5; // after side 2, core ~35–45°C
 
-  const restTime = Math.round(90 * tf); // rest time
+  // ---- INDIRECT PHASE ----
+  // Only for steaks > 20mm OR when we can't reach target with sear alone
+  // After searing core is ~sear2EndTemp, need to reach targetTemp
+  const coreTempAfterSear = Math.min(sear2EndTemp, targetTemp - 2);
+  const tempDeltaNeeded = targetTemp - coreTempAfterSear;
 
+  // Heating rate (°C/s) in indirect zone:
+  // Based on: k * (grillTemp - coreTemp) / thickness²  (simplified heat diffusion)
+  // Calibrated so that 30mm steak at 175°C takes ~15min (900s) to rise from ~40 to ~57°C
+  // k ≈ 0.00008 * (grillTemp/175) / (thickness/30)^1.5
+  const k = 0.000085 * (grillTemp / 175) / Math.pow(thickness / 30, 1.5);
+  // Time to heat from coreTempAfterSear to targetTemp using exponential approach:
+  // T(t) = T_grill - (T_grill - T_start) * e^(-k*t)
+  // Solve for t: t = -ln((T_grill - T_target)/(T_grill - T_start)) / k
+  const tempDiff = grillTemp - coreTempAfterSear;
+  const tempDiffTarget = grillTemp - targetTemp;
+  let indirectTime = 0;
+  if (tempDiff > 0 && tempDiffTarget > 0 && tempDiffTarget < tempDiff) {
+    indirectTime = Math.round(-Math.log(tempDiffTarget / tempDiff) / k);
+  } else {
+    // Fallback: linear estimate
+    indirectTime = Math.round(tempDeltaNeeded / (k * (grillTemp - (coreTempAfterSear + targetTemp) / 2)));
+  }
+  // Enforce realistic bounds: 10–40 min for indirect
+  indirectTime = Math.max(600, Math.min(2400, indirectTime));
+
+  // ---- REST PHASE ----
+  // 5–10 min: 300–600s, scales with thickness
+  const restTime = Math.round(300 + (thickness / 10) * 30);
+
+  // ---- BUILD PHASES ----
   let phases = [];
+  const needsIndirect = thickness > 20 || targetTemp > 57;
 
-  if (thickness <= 25) {
-    // THIN: only direct
+  if (!needsIndirect) {
+    // THIN/QUICK: direct only, 2 sides + rest
     phases = [
       {
-        id: 'sear1',
-        title: 'SEITE 1 GRILLEN',
+        id: 'sear1', title: 'SEITE 1 GRILLEN',
         badge: (p, t) => `PHASE ${p+1} / ${t}`,
-        instruction: 'Steak auf die direkte Hitzezone legen. Nicht bewegen lassen!',
-        seconds: Math.round(searBase),
-        type: 'direct',
+        instruction: 'Steak auf die direkte Hitzezone legen — heiß und unberührt grillen!',
+        seconds: searPerSide, type: 'direct',
+        startTemp: ROOM_TEMP, endTemp: sear1EndTemp,
         nextHint: 'Gleich wenden — halte die Zange bereit.',
       },
       {
-        id: 'sear2',
-        title: 'SEITE 2 GRILLEN',
+        id: 'sear2', title: 'SEITE 2 GRILLEN',
         badge: (p, t) => `PHASE ${p+1} / ${t}`,
-        instruction: 'Steak wenden. Weiter auf direkter Hitze grillen.',
-        seconds: Math.round(searBase),
-        type: 'direct',
-        nextHint: 'Steak von der Hitze nehmen und ruhen lassen.',
+        instruction: 'Wenden! Zweite Seite scharf grillen.',
+        seconds: searPerSide, type: 'direct',
+        startTemp: sear1EndTemp, endTemp: targetTemp,
+        nextHint: 'Steak vom Grill nehmen und ruhen lassen.',
       },
       {
-        id: 'rest',
-        title: 'RUHEN LASSEN',
+        id: 'rest', title: 'RUHEN LASSEN',
         badge: (p, t) => `PHASE ${p+1} / ${t}`,
-        instruction: 'Steak von der Hitze nehmen, locker mit Folie abdecken und ruhen lassen.',
-        seconds: restTime,
-        type: 'rest',
-        nextHint: 'Danach: Steak aufschneiden und genießen!',
+        instruction: 'Steak vom Grill nehmen, locker mit Folie abdecken und ruhen lassen.',
+        seconds: restTime, type: 'rest',
+        startTemp: targetTemp, endTemp: targetTemp,
+        nextHint: 'Aufschneiden und genießen!',
       },
     ];
   } else {
-    // THICK: sear then indirect
-    const indirectTime2 = Math.max(120, indirectTime);
+    // THICK / HIGH DONENESS: sear → indirect → rest
+    const indirectGrillTemp = Math.min(grillTemp, 200); // indirect zone capped at 200°C
     phases = [
       {
-        id: 'sear1',
-        title: 'SEITE 1 ANBRATEN',
+        id: 'sear1', title: 'SEITE 1 ANBRATEN',
         badge: (p, t) => `PHASE ${p+1} / ${t}`,
-        instruction: 'Steak auf direkte Hitzezone — scharfes Anbraten für Kruste.',
-        seconds: Math.round(searBase * 0.8),
-        type: 'direct',
-        nextHint: 'Gleich wenden für die andere Seite.',
+        instruction: 'Steak auf die direkte Sizzle-Zone (>300°C) — scharfes Anbraten für Röstaromen!',
+        seconds: searPerSide, type: 'direct',
+        startTemp: ROOM_TEMP, endTemp: sear1EndTemp,
+        nextHint: 'Gleich wenden für die zweite Seite.',
       },
       {
-        id: 'sear2',
-        title: 'SEITE 2 ANBRATEN',
+        id: 'sear2', title: 'SEITE 2 ANBRATEN',
         badge: (p, t) => `PHASE ${p+1} / ${t}`,
-        instruction: 'Wenden und zweite Seite scharf anbraten.',
-        seconds: Math.round(searBase * 0.8),
-        type: 'direct',
-        nextHint: 'Steak in die indirekte Zone verschieben — Deckel schließen.',
+        instruction: 'Wenden! Zweite Seite scharf anbraten.',
+        seconds: searPerSide, type: 'direct',
+        startTemp: sear1EndTemp, endTemp: coreTempAfterSear,
+        nextHint: 'Steak in die indirekte Zone verschieben — Deckel schließen!',
       },
       {
-        id: 'indirect',
-        title: 'INDIREKTES GAREN',
+        id: 'indirect', title: 'INDIREKTES GAREN',
         badge: (p, t) => `PHASE ${p+1} / ${t}`,
-        instruction: 'Steak in die indirekte Zone verschieben. Grilldeckel schließen.',
-        seconds: indirectTime2,
-        type: 'indirect',
+        instruction: `Steak in die indirekte Zone verschieben. Grilldeckel schließen. Temperatur auf ${Math.min(grillTemp,200)}°C halten.`,
+        seconds: indirectTime, type: 'indirect',
+        startTemp: coreTempAfterSear, endTemp: targetTemp,
+        grillZoneTemp: Math.min(grillTemp, 200),
         nextHint: 'Steak herausnehmen und ruhen lassen.',
-        startCoreTemp: 40,
-        endCoreTemp: targetTemp,
       },
       {
-        id: 'rest',
-        title: 'RUHEN LASSEN',
+        id: 'rest', title: 'RUHEN LASSEN',
         badge: (p, t) => `PHASE ${p+1} / ${t}`,
-        instruction: 'Steak von der Hitze nehmen. Locker mit Folie abdecken.',
-        seconds: restTime,
-        type: 'rest',
-        nextHint: 'Jetzt aufschneiden — Kerntemperatur prüfen und genießen!',
+        instruction: 'Steak vom Grill nehmen. Locker mit Alufolie abdecken und ruhen lassen.',
+        seconds: restTime, type: 'rest',
+        startTemp: targetTemp, endTemp: targetTemp,
+        nextHint: 'Aufschneiden — Kerntemperatur prüfen und genießen!',
       },
     ];
   }
@@ -837,55 +885,63 @@ function calcPhases(thickness, grillTemp, donenessId, meatType) {
 
 // ===================== DONENESS FROM TEMP =====================
 function donenessFromTemp(temp) {
-  if (temp < 40) return { label: 'Roh', sub: '< 40°C', pct: temp / 48 * 5, color: '#888' };
-  if (temp < 48) return { label: 'Blue Rare', sub: '40–48°C', pct: 3 + (temp-40)/8*7, color: '#a03030' };
-  if (temp < 52) return { label: 'Rare', sub: '48–52°C', pct: 10 + (temp-48)/4*15, color: '#c0392b' };
-  if (temp < 55) return { label: 'Medium Rare', sub: '52–55°C', pct: 25 + (temp-52)/3*25, color: '#e74c3c' };
+  if (temp < 20) return { label: 'Zimmertemp.', sub: '~20°C', pct: 0, color: '#666' };
+  if (temp < 40) return { label: 'Roh', sub: '< 40°C', pct: (temp-20)/20*5, color: '#888' };
+  if (temp < 48) return { label: 'Blue Rare', sub: '40–48°C', pct: 5 + (temp-40)/8*7, color: '#a03030' };
+  if (temp < 52) return { label: 'Rare', sub: '48–52°C', pct: 12 + (temp-48)/4*15, color: '#c0392b' };
+  if (temp < 55) return { label: 'Medium Rare', sub: '52–55°C', pct: 27 + (temp-52)/3*23, color: '#e74c3c' };
   if (temp < 60) return { label: 'Medium', sub: '55–60°C', pct: 50 + (temp-55)/5*20, color: '#e67e22' };
   if (temp < 65) return { label: 'Medium Well', sub: '60–65°C', pct: 70 + (temp-60)/5*15, color: '#d35400' };
   return { label: 'Well Done', sub: '65°C+', pct: 85 + Math.min((temp-65)/10*15, 15), color: '#7f4d0e' };
 }
 
 // ===================== CORE TEMP ESTIMATE =====================
+/**
+ * Returns estimated core temperature for the current moment.
+ * Uses per-phase physics models with smooth transitions.
+ */
 function estimateCoreTemp() {
   const phase = state.phases[state.currentPhase];
   const elapsed = state.phaseTotalSeconds - state.phaseSecondsLeft;
-  const phaseFraction = elapsed / state.phaseTotalSeconds;
+  const phaseFraction = Math.min(1, elapsed / state.phaseTotalSeconds);
+  const startT = phase.startTemp;
+  const endT = phase.endTemp;
 
   if (phase.type === 'direct') {
-    // Direct: surface rises fast, core slower
-    // Approximate: core goes from startCoreTemp toward ~40–45°C during searing
-    const phaseIndex = state.currentPhase;
-    if (phaseIndex === 0) {
-      return state.startCoreTemp + phaseFraction * (20 - state.startCoreTemp);
-    } else if (phaseIndex === 1) {
-      return 20 + phaseFraction * 20;
-    }
-    return 40 + phaseFraction * 5;
+    // Direct heat: fast surface, moderate core. Linear with slight ease-in.
+    // Core rises quickly at first (surface contact), then plateaus a bit
+    const eased = Math.pow(phaseFraction, 0.7);
+    return startT + eased * (endT - startT);
+
   } else if (phase.type === 'indirect') {
-    const start = phase.startCoreTemp || 40;
-    const end = phase.endCoreTemp || 55;
-    // Sigmoid-ish curve: starts slow, accelerates, slows near target
+    // Newton's law of cooling: exponential approach to grill zone temp
+    // T(t) = T_grill - (T_grill - T_start) * e^(-k*t)
+    // We normalize so that at t=phaseTotalSeconds, T ≈ endT
+    const T_grill = phase.grillZoneTemp || state.grillTemp;
+    const k = state.indirectK;
+    const t = elapsed;
+    if (k && k > 0) {
+      return T_grill - (T_grill - startT) * Math.exp(-k * t);
+    }
+    // Fallback sigmoid
     const eased = 0.5 - 0.5 * Math.cos(Math.PI * phaseFraction);
-    return start + eased * (end - start);
+    return startT + eased * (endT - startT);
+
   } else if (phase.type === 'rest') {
-    // During rest, temp first rises ~2-4°C then starts dropping slowly
-    const peakFraction = 0.3;
-    const d = DONENESS.find(x => x.id === state.doneness);
-    const peak = d.targetTemp + 2;
-    if (phaseFraction <= peakFraction) {
-      return d.targetTemp + (phaseFraction / peakFraction) * 2;
+    // Carry-over: rises +2°C in first 30%, then slowly falls back
+    const peakFrac = 0.3;
+    const peak = endT + 2;
+    if (phaseFraction <= peakFrac) {
+      return endT + (phaseFraction / peakFrac) * 2;
     } else {
-      return peak - ((phaseFraction - peakFraction) / (1 - peakFraction)) * 2;
+      return peak - ((phaseFraction - peakFrac) / (1 - peakFrac)) * 2;
     }
   }
-  return state.startCoreTemp;
+  return startT;
 }
 
 // ===================== START =====================
 function startCooking() {
-  state.doneness = document.querySelector('.pill.selected')?.textContent.split(' (')[0].toLowerCase().replace(' ', '-') || 'medium';
-  // re-derive id
   const sel = DONENESS.find(d => document.querySelector('.pill.selected')?.textContent.includes(d.label));
   state.doneness = sel ? sel.id : 'medium';
   state.thickness = parseInt(document.getElementById('thickness-slider').value);
@@ -897,9 +953,21 @@ function startCooking() {
   state.totalElapsed = 0;
   state.paused = false;
 
+  // Pre-calculate k for indirect phase for smooth temp curve
+  const indPhase = state.phases.find(p => p.type === 'indirect');
+  if (indPhase) {
+    const T_grill = indPhase.grillZoneTemp || state.grillTemp;
+    const T_start = indPhase.startTemp;
+    const T_end = indPhase.endTemp;
+    if (T_grill > T_end && T_grill > T_start) {
+      state.indirectK = -Math.log((T_grill - T_end) / (T_grill - T_start)) / indPhase.seconds;
+    }
+  }
+
   document.getElementById('setup-screen').style.display = 'none';
   document.getElementById('timer-screen').style.display = 'block';
 
+  requestWakeLock();
   loadPhase(0);
   runTimer();
 }
@@ -983,16 +1051,102 @@ function togglePause() {
   document.getElementById('pause-btn').textContent = state.paused ? '▶ Weiter' : '⏸ Pause';
 }
 
+// ===================== WAKE LOCK (Bildschirm aktiv halten) =====================
+let wakeLock = null;
+
+async function requestWakeLock() {
+  if ('wakeLock' in navigator) {
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } catch(e) { console.warn('WakeLock nicht verfügbar:', e); }
+  }
+}
+
+async function releaseWakeLock() {
+  if (wakeLock) { try { await wakeLock.release(); } catch(e) {} wakeLock = null; }
+}
+
+// Re-acquire wake lock when page becomes visible again
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && state.phases.length > 0 && !state.paused) {
+    requestWakeLock();
+  }
+});
+
+// ===================== ALARM SOUND (Web Audio API) =====================
+let audioCtx = null;
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  // Resume if suspended (iOS requires user gesture first)
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+// Unlock audio on first user interaction (iOS requirement)
+function unlockAudio() {
+  const ctx = getAudioCtx();
+  const buf = ctx.createBuffer(1, 1, 22050);
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  src.connect(ctx.destination);
+  src.start(0);
+  document.removeEventListener('touchstart', unlockAudio);
+  document.removeEventListener('click', unlockAudio);
+}
+document.addEventListener('touchstart', unlockAudio, { once: true });
+document.addEventListener('click', unlockAudio, { once: true });
+
+function playAlarmSound(isFinal) {
+  try {
+    const ctx = getAudioCtx();
+    const now = ctx.currentTime;
+
+    function beep(freq, start, dur, vol) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now + start);
+      gain.gain.setValueAtTime(0, now + start);
+      gain.gain.linearRampToValueAtTime(vol, now + start + 0.02);
+      gain.gain.setValueAtTime(vol, now + start + dur - 0.05);
+      gain.gain.linearRampToValueAtTime(0, now + start + dur);
+      osc.start(now + start);
+      osc.stop(now + start + dur);
+    }
+
+    if (isFinal) {
+      // Final fanfare: ascending triumphant tones
+      beep(523, 0.0,  0.18, 0.5); // C5
+      beep(659, 0.2,  0.18, 0.5); // E5
+      beep(784, 0.4,  0.18, 0.5); // G5
+      beep(1047,0.6,  0.35, 0.6); // C6 long
+      beep(784, 1.05, 0.15, 0.4);
+      beep(1047,1.25, 0.5,  0.6);
+    } else {
+      // Phase alarm: 3 urgent beeps
+      beep(880, 0.0,  0.15, 0.55); // A5
+      beep(880, 0.22, 0.15, 0.55);
+      beep(1047,0.44, 0.3,  0.65); // C6
+    }
+  } catch(e) { console.warn('Audio error:', e); }
+}
+
 // ===================== ALARM =====================
 function showAlarm() {
-  const phase = state.phases[state.currentPhase];
   const next = state.phases[state.currentPhase + 1];
+  const isFinal = !next;
   const overlay = document.getElementById('alarm-overlay');
-  document.getElementById('alarm-title').textContent = next ? 'PHASE FERTIG!' : 'FERTIG!';
+  document.getElementById('alarm-title').textContent = isFinal ? 'FERTIG!' : 'PHASE FERTIG!';
   document.getElementById('alarm-msg').textContent = next ? next.instruction : 'Steak ist perfekt – guten Appetit!';
   overlay.classList.add('show');
-  // vibrate if supported
-  if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
+  // Vibration
+  if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300]);
+  // Sound
+  playAlarmSound(isFinal);
 }
 
 function dismissAlarm() {
@@ -1014,6 +1168,7 @@ function advancePhase() {
 // ===================== DONE =====================
 function showDone() {
   clearInterval(state.timer);
+  releaseWakeLock();
   document.getElementById('timer-screen').style.display = 'none';
   document.getElementById('done-screen').style.display = 'block';
 
@@ -1031,12 +1186,36 @@ function showDone() {
 // ===================== RESET =====================
 function resetApp() {
   clearInterval(state.timer);
+  releaseWakeLock();
   document.getElementById('alarm-overlay').classList.remove('show');
   document.getElementById('done-screen').style.display = 'none';
   document.getElementById('timer-screen').style.display = 'none';
   document.getElementById('setup-screen').style.display = 'block';
+  state.phases = [];
   state.paused = false;
   document.getElementById('pause-btn').textContent = '⏸ Pause';
+}
+
+
+// ===================== SLIDER HELPERS =====================
+function updateThickness(val) {
+  document.getElementById('thickness-val').textContent = val + ' mm';
+}
+
+function updateGrillTemp(val) {
+  const v = parseInt(val);
+  document.getElementById('grill-temp-val').textContent = v + ' °C';
+  const hint = document.getElementById('grill-temp-hint');
+  if (v <= 150) {
+    hint.textContent = '120–150°C: Sehr gleichmäßig, 30–40 Min (dicke Stücke)';
+    hint.style.color = '#7bc67b';
+  } else if (v <= 200) {
+    hint.textContent = '150–200°C: Optimal — saftig & gleichmäßig, 10–20 Min';
+    hint.style.color = 'var(--gold)';
+  } else {
+    hint.textContent = '>200°C: Schneller, aber Rand kann grauer werden';
+    hint.style.color = 'var(--ember)';
+  }
 }
 
 // ===================== BOOT =====================
